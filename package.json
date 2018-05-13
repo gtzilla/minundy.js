@@ -1,0 +1,28 @@
+{
+  "name": "minimal_.js",
+  "version": "0.0.1",
+  "description": "Not a complex, configurable or complete build system for underscore.js",
+  "main": "src/minimal_.js",
+  "author": "Develop NYC <gt@developnyc.com>",
+  "license": "See LICENSE.md",
+  "private": true,
+  "flat": true,	
+  "repository": { 
+    "type" : "git",
+    "url" : "git@github.com:gtzilla/minimal_.js.git"
+  },   
+  "dependencies": {
+    "underscore": "1.9.0",
+    "commander": "^2.15.1"
+  },
+  "engines": {
+    "node": ">=10.0.0"
+  },
+  "scripts": {
+    "watch": "node scripts/minimal_.js"
+  },
+  "devDependencies": {
+    "commander": "^2.15.1",
+    "node": "^10.0.0"
+  }    
+}
