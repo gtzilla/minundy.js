@@ -19,7 +19,7 @@
     "node": ">=10.0.0"
   },
   "scripts": {
-    "watch": "node scripts/minimal_.js"
+    "watch": "node src/minimal_.js --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug"
   },
   "devDependencies": {
     "commander": "^2.15.1",
