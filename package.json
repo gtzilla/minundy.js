@@ -1,6 +1,6 @@
 {
   "name": "minimal_.js",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Not a complex, configurable or complete build system for underscore.js",
   "main": "src/minimal_.js",
   "author": "Develop NYC <gt@developnyc.com>",
@@ -19,7 +19,8 @@
     "node": ">=10.0.0"
   },
   "scripts": {
-    "watch": "node src/minimal_.js --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug"
+    "watch": "node src/minimal_.js --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug",
+    "build": "node src/minimal_.js --debug --only-build"
   },
   "devDependencies": {
     "commander": "^2.15.1",
