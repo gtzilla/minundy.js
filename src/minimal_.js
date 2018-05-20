@@ -106,7 +106,8 @@
 var program = require('commander');
 // PARSE CLI arguments into structure
 program
-  .version('0.0.1')
+  .version('0.0.4')
+  .option('-r, --root [value]', 'Base path, if any, to use for all relative directories')
   .option('-w, --watch [value]', 'Watch this directory for changes to HTML')
   .option('-d, --distro [value]', 'Path to distro folder, templates.js')
   .option('-s, --distro-separate [value]', 'Single JS templates folder')
@@ -115,7 +116,10 @@ program
   .option('--only-build', 'Do not watch, only build files. Overrides watch flag.')
   .parse(process.argv);
 
+
+
 const monitor_path_str = program.watch || "js-templates";
+const root_dir = program.root || null;
 const separate_compiled_path_str = program.distroSeparate || "js-dist-separate";
 const compiled_path_str = program.distro || "js-dist";
 let default_underscore_template_config = {variable:'data'};
@@ -128,9 +132,15 @@ const _ = require("underscore");
 // paths on filesystem
 // IMPROVE: be smarter, if abs path don't join
 // GLOBALS!
-const monitor_path = path.join(__dirname, "../", monitor_path_str);
-const separate_compiled_path = path.join(__dirname, "../", separate_compiled_path_str);
-const compiled_path = path.join(__dirname, "../", compiled_path_str);
+const base_path = root_dir ? root_dir : path.join(__dirname, "../");
+const monitor_path = _pathis(monitor_path_str, base_path);
+const separate_compiled_path = _pathis(separate_compiled_path_str, base_path);
+const compiled_path = _pathis(compiled_path_str, base_path);
+
+
+function _pathis(_str, base_path) {
+  return _str.startsWith("/") ? _str : path.join(base_path, _str);
+}
 
 // Quick, Sane, Logs
 function qlog() {
@@ -231,8 +241,15 @@ function on_html_directory_read(err, filenames) {
   _.each(filtered, function(filename) {
     let info = assemble_filepath(filename);
     fs.readFile(info.in, 'utf8', (err, contents) => {
-      // the actual important part. turn HTML into JS
-      let blob = _.template(contents, default_underscore_template_config).source;
+      // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
+      let blob;
+      try {
+         blob = _.template(contents, default_underscore_template_config).source;
+      } catch(e) {
+        qlog("ERROR: file", filename, "Message", e, "Filepath info", info);
+        throw(e); // HALT! only important part..
+      }
+      
       fs.writeFile(info.out, 'templates.' + info.variable + "=" + blob, () => {
         counter -= 1;
         if(counter <= 0) {
@@ -254,7 +271,7 @@ function process_and_build_all() {
 
 function guarantee_paths_exist() {
   if (!fs.existsSync(monitor_path)){
-    fs.mkdirSync(compiled_path);
+    fs.mkdirSync(monitor_path);
   }  
   if (!fs.existsSync(compiled_path)){
     fs.mkdirSync(compiled_path);
@@ -276,19 +293,18 @@ function main() {
     "Paths.",
     "\nMonitor:", monitor_path,
     "\nOutput:", compiled_path,
+    "\nRoot path:", root_dir ? root_dir : "Unset",
     "\nSingle JS files:", separate_compiled_path,
-    "\n\n"
-  );  
-
+    "\n"
+  );
   guarantee_paths_exist();
   if(program.onlyBuild) {
-    console.log("Will not watch files.");
+    qlog("Will not watch files.");
     process_and_build_all();
   } else {
     fs.watch(monitor_path, { encoding: 'buffer' },  monitor_files_and_compile);
     fs.watch(separate_compiled_path, { encoding: 'buffer' },  monitor_and_compile_combined_js);    
   }
-
 }
 
 main();
