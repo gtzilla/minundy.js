@@ -106,7 +106,7 @@
 var program = require('commander');
 // PARSE CLI arguments into structure
 program
-  .version('0.0.4')
+  .version('0.0.5')
   .option('-r, --root [value]', 'Base path, if any, to use for all relative directories')
   .option('-w, --watch [value]', 'Watch this directory for changes to HTML')
   .option('-d, --distro [value]', 'Path to distro folder, templates.js')
@@ -246,7 +246,7 @@ function on_html_directory_read(err, filenames) {
       try {
          blob = _.template(contents, default_underscore_template_config).source;
       } catch(e) {
-        qlog("ERROR: file", filename, "Message", e, "Filepath info", info);
+        console.log("ERROR: file", filename, "Message", e, "Filepath info", info);
         throw(e); // HALT! only important part..
       }
       

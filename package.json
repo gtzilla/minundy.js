@@ -1,6 +1,6 @@
 {
   "name": "minimal_.js",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Not a complex, configurable or complete build system for underscore.js",
   "main": "src/minimal_.js",
   "author": "Develop NYC <gt@developnyc.com>",
