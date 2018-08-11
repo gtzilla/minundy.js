@@ -4,7 +4,7 @@
   "description": "Not a complex, configurable or complete build template system for underscore.js. minimal underscore -> min und -> minundy.js",
   "main": "src/minundy.js",
   "author": "gtzilla <gregory.tomlinson@gmail.com>",
-  "license": "See LICENSE",
+  "license": "MIT",
   "public":true,
   "flat": true,	
   "repository": { 
@@ -24,7 +24,7 @@
     "alert": "terminal-notifier -sender com.googlecode.iterm2 -activate com.googlecode.iterm2 -group minundy -sound default -message \"minundy.js exited. Potential error.\" -title \"Yarn Watch\"",
     "watch_alert": "yarn watch --only-build &&  yarn watch || yarn alert",
     "hash":"git log --name-status HEAD^..HEAD | grep --color commit",
-    "root_dir": "node src/minundy.js --root /Users/gregory/Documents/code/javascript/minundy.js/test" 
+    "root_dir": "node src/minundy.js --root ~/Documents/code/javascript/minundy.js/test" 
   },
   "devDependencies": {
     "commander": "^2.15.1",
