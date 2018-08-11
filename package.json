@@ -21,7 +21,7 @@
   "scripts": {
     "watch": "node src/minundy.js --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug",
     "build": "node src/minundy.js --debug --only-build",
-    "alert": "terminal-notifier -sender com.googlecode.iterm2 -activate com.googlecode.iterm2 -group minimal_ -sound default -message \"minundy.js exited. Potential error.\" -title \"Yarn Watch\"",
+    "alert": "terminal-notifier -sender com.googlecode.iterm2 -activate com.googlecode.iterm2 -group minundy -sound default -message \"minundy.js exited. Potential error.\" -title \"Yarn Watch\"",
     "watch_alert": "yarn watch --only-build &&  yarn watch || yarn alert",
     "hash":"git log --name-status HEAD^..HEAD | grep --color commit",
     "root_dir": "node src/minundy.js --root /Users/gregory/Documents/code/javascript/minundy.js/test" 
