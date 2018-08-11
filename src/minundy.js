@@ -1,7 +1,7 @@
 'use strict';
 /**
-  minimal_.js
-  minimal_
+  minundy.js
+  minundy.js -> min-und-y-> minimal underscore templates system
 
   Minimal Underscore Template Build System, version 0.0.1
 
@@ -42,13 +42,13 @@
 
   Usage, Building: 
       // debug prints values from qlog
-      node minimal_.js --debug
-      node minimal_.js --watch relative/path/from/this_script/folder
-      node minimal_.js --distro relative/path/for/output/templates.js
-      node minimal_.js --distro-separate relative/path/single/files
+      node minundy.js --debug
+      node minundy.js --watch relative/path/from/this_script/folder
+      node minundy.js --distro relative/path/for/output/templates.js
+      node minundy.js --distro-separate relative/path/single/files
 
       In prod
-      node minimal_.js --only-build
+      node minundy.js --only-build
 
   Using with Yarn, Building:
 
@@ -62,7 +62,7 @@
   Package.json:
     {
       "scripts": {
-        "watch":"node scripts/minimal_.js --watch file/path/here --distro output/path/here"
+        "watch":"node scripts/minundy.js --watch file/path/here --distro output/path/here"
       }
     }
 
@@ -93,7 +93,7 @@
     - yarn.lock
     - package.json
     |
-    --> /scripts/minimal_.js
+    --> /scripts/minundy.js
     |
     --> /js-templates/*.html    
     |

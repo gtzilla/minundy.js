@@ -1,5 +1,5 @@
 
-# minimal_.js
+# minundy.js
 
 minimal underscore.js templates build tool.
 
@@ -22,7 +22,7 @@ then watching this intermediary folder for changes, via fs.watch, for combining 
 
 Works with yarn.
 
-	yarn add https://github.com/gtzilla/minimal_.js
+	yarn add https://github.com/gtzilla/minundy.js
 
 Add shortcut command line methods to package.json -> scripts
 
@@ -31,22 +31,22 @@ Add shortcut command line methods to package.json -> scripts
 
 
 
-minimal_.js uses an absolute path, based on the location of miminal_.js (fix me). Variations are untested. For example, a `package.json` declaration could look like.
+minundy.js uses an absolute path, based on the location of miminal_.js (fix me). Variations are untested. For example, a `package.json` declaration could look like.
 
 ```
   "scripts": {
-    "watch": "node node_modules/minimal_.js/src/minimal_.js --watch ../../js-templates/ --distro ../../js-dist/ --distro-separate ../../js-dist-separate/"
+    "watch": "node node_modules/minundy.js/src/minundy.js --watch ../../js-templates/ --distro ../../js-dist/ --distro-separate ../../js-dist-separate/"
   }
 ```
 
 
 ## Usage, Watch
 
-	node minimal_.js --watch path/html/to/watch  --distro path/dist/folder --distro-separate path/dist/single/file 
+	node minundy.js --watch path/html/to/watch  --distro path/dist/folder --distro-separate path/dist/single/file 
 
 ## Usage, Build
 
-	node minimal_.js --only-build --w path/html/to/watch  --distro path/dist/folder --distro-separate path/dist/single/file 
+	node minundy.js --only-build --w path/html/to/watch  --distro path/dist/folder --distro-separate path/dist/single/file 
 
 ## Debug
 
