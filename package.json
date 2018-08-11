@@ -1,11 +1,11 @@
 {
   "name": "minimal_.js",
-  "version": "0.0.5",
-  "description": "Not a complex, configurable or complete build system for underscore.js",
+  "version": "0.1.0",
+  "description": "Not a complex, configurable or complete build template system for underscore.js. minimal_",
   "main": "src/minimal_.js",
-  "author": "Develop NYC <gt@developnyc.com>",
-  "license": "See LICENSE.md",
-  "private": true,
+  "author": "gtzilla <gregory.tomlinson@gmail.com>",
+  "license": "See LICENSE",
+  "private": false,
   "flat": true,	
   "repository": { 
     "type" : "git",
