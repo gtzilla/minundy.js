@@ -30,16 +30,6 @@ Add shortcut command line methods to package.json -> scripts
 
 
 
-
-minundy.js uses an absolute path, based on the location of miminal_.js (fix me). Variations are untested. For example, a `package.json` declaration could look like.
-
-```
-  "scripts": {
-    "watch": "node node_modules/minundy.js/src/minundy.js --watch ../../js-templates/ --distro ../../js-dist/ --distro-separate ../../js-dist-separate/"
-  }
-```
-
-
 ## Usage, Watch
 
 	node minundy.js --watch path/html/to/watch  --distro path/dist/folder --distro-separate path/dist/single/file 
