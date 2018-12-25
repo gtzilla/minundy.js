@@ -103,14 +103,23 @@
 
 */
 
-var program = require('commander');
+const program = require('commander');
+const path = require('path');
+const fs = require("fs");
+const _ = require("underscore");
+
+function collect_watch_directories(filepath, memo) {
+  // console.log("collect_watch_directories", arguments);
+  memo.push(filepath);
+  return _.flatten(memo);
+}
 // PARSE CLI arguments into structure
 program
   .version('0.0.5')
-  .option('-r, --root [value]', 'Base path, if any, to use for all relative directories')
-  .option('-w, --watch [value]', 'Watch this directory for changes to HTML')
-  .option('-d, --distro [value]', 'Path to distro folder, templates.js')
-  .option('-s, --distro-separate [value]', 'Single JS templates folder')
+  .option('-r, --root <value>', 'Base path, if any, to use for all relative directories')
+  .option('-w, --watch <value>', 'Watch directory for changes to HTML. Can accept multiple', collect_watch_directories, [])
+  .option('-d, --distro <value>', 'Path to distro folder, templates.js')
+  .option('-s, --distro-separate <value>', 'Single JS templates folder')
   .option('--debug', 'Debugging, default is false', 0)
   .option('--silent', 'Quiet output. Forcibly Overrides debug to false.')
   .option('--only-build', 'Do not watch, only build files. Overrides watch flag.')
@@ -118,25 +127,28 @@ program
 
 
 
-const monitor_path_str = program.watch || "js-templates";
+const watchable_dirs = program.watch || "js-templates"; // can be array
+console.log("watchable_path", program.watch.length, program.watch);
 const root_dir = program.root || null;
 const separate_compiled_path_str = program.distroSeparate || "js-dist-separate";
 const compiled_path_str = program.distro || "js-dist";
 let default_underscore_template_config = {variable:'data'};
 
 // external packages
-const path = require('path');
-const fs = require("fs");
-const _ = require("underscore");
+
 
 // paths on filesystem
 // IMPROVE: be smarter, if abs path don't join
 // GLOBALS!
 const base_path = root_dir ? root_dir : path.join(__dirname, "../");
-const monitor_path = _pathis(monitor_path_str, base_path);
+let watchable_paths = _.map(program.watch, function(name) {
+  return path.join(base_path, name)
+});
+
+// const monitor_path = _pathis(monitor_path_str, base_path);
+// console.log("monitor_path", monitor_path);
 const separate_compiled_path = _pathis(separate_compiled_path_str, base_path);
 const compiled_path = _pathis(compiled_path_str, base_path);
-
 
 function _pathis(_str, base_path) {
   return _str.startsWith("/") ? _str : path.join(base_path, _str);
@@ -221,7 +233,21 @@ function assemble_filepath(filename) {
   data.filename = "" +filename;
   data.ext = path.parse(data.filename).ext;
   data.variable = data.filename.replace(data.ext, '');
-  data.in = path.join(monitor_path, data.filename);
+
+  // check file exists 
+  // let confirmed_watchable_paths = _.filter(watchable_paths, function(filepath) {
+  //   if(fs.existsSync(path.join(filepath, filename)) {
+  //     return true;
+  //   }
+  // });
+  
+  data.in = _.chain(watchable_paths).map(function(filepath) {
+    return path.join(filepath, data.filename);
+  }).filter(function(filepath) {
+    return fs.existsSync(filepath);
+  }).value();
+
+  // data.in = path.join(monitor_path, data.filename);
   data.out = path.join(separate_compiled_path, data.variable + ".js");
   return data;
 }
@@ -229,7 +255,10 @@ function assemble_filepath(filename) {
 function monitor_files_and_compile(event_type, filename) {
   let info = assemble_filepath(filename);
   if(event_type === 'change') {
-    fs.readFile(info.in, 'utf8', convert_html_to_js(info.in, info.out, info.variable));
+    _.each(info.in, function(currfile) {
+      fs.readFile(currfile, 'utf8', convert_html_to_js(currfile, info.out, info.variable));  
+    })
+    
   }  
 }
 
@@ -240,39 +269,52 @@ function on_html_directory_read(err, filenames) {
   let counter = filtered.length;
   _.each(filtered, function(filename) {
     let info = assemble_filepath(filename);
-    fs.readFile(info.in, 'utf8', (err, contents) => {
-      // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
-      let blob;
-      try {
-         blob = _.template(contents, default_underscore_template_config).source;
-      } catch(e) {
-        console.log("ERROR: file", filename, "Message", e, "Filepath info", info);
-        throw(e); // HALT! only important part..
-      }
-      
-      fs.writeFile(info.out, 'templates.' + info.variable + "=" + blob, () => {
-        counter -= 1;
-        if(counter <= 0) {
-          // now build the templates.js file, read single js files, accumulate and print
-          fs.readdir(separate_compiled_path, (err, filenames) => {
-            let filtered = _.filter(filenames, js_file_filter);
-            _.each(filtered, read_accumulate([], filtered.length, accumulator_completed)); 
-          });
+    _.each(info.in, function(currfile) {
+      fs.readFile(currfile, 'utf8', (err, contents) => {
+        // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
+        let blob;
+        try {
+           blob = _.template(contents, default_underscore_template_config).source;
+        } catch(e) {
+          console.log("ERROR: file", filename, "Message", e, "Filepath info", info);
+          throw(e); // HALT! only important part..
         }
-      });
-    });     
+        
+        fs.writeFile(info.out, 'templates.' + info.variable + "=" + blob, () => {
+          counter -= 1;
+          if(counter <= 0) {
+            // now build the templates.js file, read single js files, accumulate and print
+            fs.readdir(separate_compiled_path, (err, filenames) => {
+              let filtered = _.filter(filenames, js_file_filter);
+              _.each(filtered, read_accumulate([], filtered.length, accumulator_completed)); 
+            });
+          }
+        });
+      });  
+    });
+   
   });
 }
 
 function process_and_build_all() {
   // read all files in monitor path
-  return fs.readdir(monitor_path, on_html_directory_read);
+  _.each(watchable_paths, function(filepath) {
+    fs.readdir(filepath, on_html_directory_read);  
+  })
+  // return fs.readdir(monitor_path, on_html_directory_read);
 }
 
 function guarantee_paths_exist() {
-  if (!fs.existsSync(monitor_path)){
-    fs.mkdirSync(monitor_path);
-  }  
+  // odd... 
+  // _.each(watchable_paths, function(filepath) {
+  //   console.log("watchable_paths", watchable_paths)
+  //   if (!fs.existsSync(filepath)){
+  //     // fs.mkdirSync(filepath);
+  //   }     
+  // });
+  // if (!fs.existsSync(monitor_path)){
+  //   fs.mkdirSync(monitor_path);
+  // }  
   if (!fs.existsSync(compiled_path)){
     fs.mkdirSync(compiled_path);
   }
@@ -291,7 +333,7 @@ function main() {
   }
   qlog(
     "Paths.",
-    "\nMonitor:", monitor_path,
+    "\nMonitor:", watchable_paths,
     "\nOutput:", compiled_path,
     "\nRoot path:", root_dir ? root_dir : "Unset",
     "\nSingle JS files:", separate_compiled_path,
@@ -302,7 +344,10 @@ function main() {
     qlog("Will not watch files.");
     process_and_build_all();
   } else {
-    fs.watch(monitor_path, { encoding: 'buffer' },  monitor_files_and_compile);
+    _.each(watchable_paths, function(filepath) {
+      fs.watch(filepath, { encoding: 'buffer' },  monitor_files_and_compile);
+    });
+    // fs.watch(monitor_path, { encoding: 'buffer' },  monitor_files_and_compile);
     fs.watch(separate_compiled_path, { encoding: 'buffer' },  monitor_and_compile_combined_js);    
   }
 }
