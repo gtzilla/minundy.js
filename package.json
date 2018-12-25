@@ -1,7 +1,7 @@
 {
   "name": "minundy.js",
-  "version": "0.1.1",
-  "description": "Not a complex, configurable or complete build template system for underscore.js. minimal underscore -> min und -> minundy.js",
+  "version": "0.2.2",
+  "description": "Minimal Underscore Template Build System -> min und -> minundy.js. Manages pre-building JS/HTML templates using underscore.js",
   "main": "src/minundy.js",
   "author": "gtzilla <gregory.tomlinson@gmail.com>",
   "license": "MIT",
@@ -12,14 +12,14 @@
     "url": "git@github.com:gtzilla/minundy.js.git"
   },
   "dependencies": {
-    "underscore": "1.9.0",
-    "commander": "^2.15.1"
+    "commander": "^2.15.1",
+    "underscore": "1.9.0"
   },
   "engines": {
     "node": ">=10.0.0"
   },
   "scripts": {
-    "watch": "node src/minundy.js --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug",
+    "watch": "node src/minundy.js --watch watch/folder_a.html  --watch test/html --distro test/js-dist --distro-separate test/js-dist-separate --debug",
     "build": "node src/minundy.js --debug --only-build",
     "alert": "terminal-notifier -sender com.googlecode.iterm2 -activate com.googlecode.iterm2 -group minundy -sound default -message \"minundy.js exited. Potential error.\" -title \"Yarn Watch\"",
     "watch_alert": "yarn watch --only-build &&  yarn watch || yarn alert",
