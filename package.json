@@ -19,7 +19,9 @@
   "engines": {
     "node": ">=10.0.0"
   },
-  "scripts": {},
+  "scripts": {
+      "watch":"node node_modules/minundy.js/src/minundy.js watch --infolder test/sample/html"
+    },
   "devDependencies": {
     "commander": "^2.15.1",
     "node": "^10.0.0"

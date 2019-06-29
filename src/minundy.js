@@ -1,8 +1,9 @@
 'use strict';
 /**
   author: gtzilla
-  copyright: MIT 2019
-
+  copyright: gregory tomlinson 2019
+  License: MIT
+  
   minundy.js
   minundy.js -> min-und-y-> minimal underscore templates compilation package
 
@@ -35,7 +36,7 @@
   Package.json:
     {
       "scripts": {
-        "watch":"node scripts/minundy.js --watch file/path/here --distro output/path/here"
+        "watch":"node scripts/minundy.js watch --infolder file/path/here --distro output/path/here"
       }
     }
 
@@ -52,6 +53,8 @@ const fs = require("fs");
 const _ = require("underscore");
 const path_abs_regexp = /^\//;
 const console = require("logdebug.js");
+const infolder_text = 'Input directory to serve as for changes to HTML. ' 
+                        + 'Can accept multiple --infolder. Paths are relative to CWD';
 let default_underscore_template_config = {variable:'data'};
 
 function collect_watchable_dirs(filepath, memo) {
@@ -79,12 +82,11 @@ program
 
 program  
   .option('-r, --root <value>', 'Base path, if any, to use for all relative directories', null)
-  .option('-w, --watch <value>', 'Watch directory for changes to HTML. Can accept multiple --watch. Relative to CWD', collect_watchable_dirs, [])
+  .option('-f, --infolder <value>', infolder_text, collect_watchable_dirs, [])
   .option('-d, --distro <value>', 'Path to distro folder, templates.js, Relative to CWD', null)
   .option('--debug [opt_value]', 'Debugging, default is false. Full debug = --debug 5', parse_debug_param, 1)
   .option('--silent', 'Quiet output. Forcibly Overrides debug to false.')
-  .option('-A, --disallow_prepopulate', 'Disallow the prepopulation step at init.')
-  .option('--only-build', 'Deprecated. Use command `just-build`');
+  .option('-A, --disallow_prepopulate', 'Disallow the prepopulation step at init.');
 
 program.command("just-build")
         .action(action_just_build);
@@ -262,8 +264,8 @@ function action_just_build(cmd) {
   let _cwd = process.cwd(), 
       html_files_contents = [],
       total_count = 0;
-  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.watch||cmd.raw);
-  return _.chain(cmd.parent.watch||cmd.raw).map(function(file_path) {
+  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder||cmd.raw);
+  return _.chain(cmd.parent.infolder||cmd.raw).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
   }).each(function(abs_watch_html_path) {
     fs.readdir(abs_watch_html_path, function(err, dir_files) {
@@ -317,7 +319,7 @@ function action_watch_and_compile(cmd) {
   console.set_silent(cmd.parent.silent);
   let _cwd = process.cwd();
   let abs_path_dist_sep = null, abs_path_dist = null;
-  console.debug("action_watch_and_compile", "unmolested path", cmd.parent.watch);
+  console.debug("action_watch_and_compile", "unmolested path", cmd.parent.infolder);
   if(cmd.distroSeparate) {
     console.log("using dist sep %s", cmd.distroSeparate)
     abs_path_dist_sep = build_abs_path(cmd.distroSeparate, cmd, _cwd);
@@ -333,7 +335,7 @@ function action_watch_and_compile(cmd) {
     guarantee_paths_exist(abs_path_dist);
   }
 
-  let abs_paths = _.chain(cmd.parent.watch).map(function(file_path) {
+  let abs_paths = _.chain(cmd.parent.infolder).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
   }).each(function(file_path) {
     // this is the file path of teh watchable directory
