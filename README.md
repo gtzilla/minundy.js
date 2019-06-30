@@ -82,16 +82,21 @@ get all messages, including `console.debug`
 + Relative to CWD at execution time, not script location
 + Renamed `--watch` to `--infolder` 
 + Absolute path checking and preservation `--distro /var/app/location --infolder some/relative/location` 
-+ 
++ logging verbosity support via `logdebug.js`
 
 ## Distrubtion
 
-This package is not yet listed in NPM / Yarn repository listing services.
-
-
-You can add / install to your project directly through the github repos.
+This package is not yet listed in NPM / Yarn repository listing services. However, you can add / install to your project directly through the github repos.
 
 ```
 yarn add --flat https://github.com/gtzilla/minundy.js
 
+```
+
+### Target Specific Commit or Release in Github
+
+Target release 0.2.2, which is commit `775d2a4cf11c738b2e978b651d9a47eb6c2fe84f`
+
+```
+yarn add --flat https://github.com/gtzilla/minundy.js/archive/775d2a4cf11c738b2e978b651d9a47eb6c2fe84f.tar.gz
 ```
