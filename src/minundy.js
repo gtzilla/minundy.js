@@ -1,169 +1,115 @@
 'use strict';
 /**
+  author: gtzilla
+  copyright: gregory tomlinson 2019
+  License: MIT
+  
   minundy.js
-  minundy.js -> min-und-y-> minimal underscore templates system
+  minundy.js -> min-und-y-> minimal underscore templates compilation package
 
-  Minimal Underscore Template Build System, version 0.0.1
+  # Minimal Underscore Template Build System, minundy
 
-  Not a complex, configurable or complete build system for underscore.js
+  Not a complex, configurable or complete build system for underscore.js. The minimal.
 
   Transforms HTML templates, written for underscore.js template library, into JavaScript methods
   and writes to output file, such as js-dist/templates.js.
 
-  Works with Chrome Extensions limited environment. Originally written to support
-  JavaScript templating in Chrome Extensions and Browser Extensions
-
-  requires: underscore.js, node v10
+  turns __NAME__.html into `templates.__NAME__({})`
+  
+  Uses 'data' internally for templates. Requires: underscore.js, node v10+
 
   Much like other configurable build systems, this 
   script concatenates files together. To improve speed,
-  this scrpit keeps an intermediary step folder, processing HTML to JS into a js-dist-separate folder
-  then watching this intermediary folder for changes, via fs.watch, for combining to templates.js
+  this scrpit keeps an intermediary step folder, processing HTML to JS into a `js-dist-separate/` 
+  folder, which could be a temporary system folder. 
+  Then, watching this intermediary folder for changes, via fs.watch, which lets deltas be tracked and updated. 
 
-  ASCI Visualization
+  On file change and rename, all JS files
+  in `--distro-separate` are built and combined into templates.js
+
+  ## ASCI Visualization. Watch folder --> temp folder / distro separate --> single templates.js
 
   .html --> .js -> |
   .html --> .js -> | (*.js) ---> templates.js
   .html --> .js -> |
 
-  This has a few benefits, some drawbacks. 
-
-  Benefit:
-    Faster compile time for templates.js, don't have to recompile all files, just combine
-    can link directly to final file during dev. for chrome exts this is helpful bc no server
-    can link directly to individual "compiled" files (html->js)
-
-
-  Drawback:
-    Not a "standardize" build system
-    Extending requires modifications to original
-    documentation is very thin
-
-
-  Usage, Building: 
-      // debug prints values from qlog
-      node minundy.js --debug
-      node minundy.js --watch relative/path/from/this_script/folder
-      node minundy.js --distro relative/path/for/output/templates.js
-      node minundy.js --distro-separate relative/path/single/files
-
-      In prod
-      node minundy.js --only-build
-
-  Using with Yarn, Building:
-
-    yarn run watch
-    
-
-  Can mix command line arguments with yarn commands
-  
-    yarn watch --debug
-
   Package.json:
     {
       "scripts": {
-        "watch":"node scripts/minundy.js --watch file/path/here --distro output/path/here"
+        "watch":"node scripts/minundy.js watch --infolder file/path/here --distro output/path/here"
       }
     }
 
   Usage, Implementation:
-    Link to the final, js-dist/templates.js, from HTML template. 
 
-    All files are translated to 
-    the appropriately named `templates.method`. For example, the HTML template: `my_first_template.html`
-    would be available as templates.my_first_template and used like `templates.my_first_template({...})
-
-    This script setup avoids underscore 'with' template scoping and instead 
-    declares {'variable':'data'}
-    making all template variables descend from a data [Object Object]
-
-
-  Other Thoughts:
-
-    Uses some conventions from es2015 and later, such as let, 
-    const arrow anonymous function declaration (syntax sugar)
-
-    Skips promises and async/await to avoid 
-    needing a build system for the build system. too meta
-
-  Assumed Directory Structure:
-
-    (project root)
-    /
-    - yarn.lock
-    - package.json
-    |
-    --> /scripts/minundy.js
-    |
-    --> /js-templates/*.html    
-    |
-    --> /js-dist/templates.js
-    |
-    --> /js-dist-separate/*.js
-
+  ```
+    <script src="js-dist/templates.js"></script>
+  ```
 */
-
 const program = require('commander');
 const path = require('path');
+const os = require("os");
 const fs = require("fs");
 const _ = require("underscore");
+const path_abs_regexp = /^\//;
+const console = require("logdebug.js");
+const infolder_text = 'Input directory to serve as for changes to HTML. ' 
+                        + 'Can accept multiple --infolder. Paths are relative to CWD';
+let default_underscore_template_config = {variable:'data'};
 
-function collect_watch_directories(filepath, memo) {
-  // console.log("collect_watch_directories", arguments);
+function collect_watchable_dirs(filepath, memo) {
   memo.push(filepath);
   return _.flatten(memo);
 }
-// PARSE CLI arguments into structure
+
+function generate_temp_dir(tmp_prefix='minundy_js-') {
+  let temp_dir = fs.mkdtempSync(path.join(os.tmpdir(), tmp_prefix), function(err, folder) {
+    if(err) {
+      console.error("ERROR with temp directory, while watching", err);
+      throw "Failed TEMP DIR";
+    }
+  });
+  return temp_dir; 
+}
+// always generate a temp dir path
+const TEMP_PATH_ABS = generate_temp_dir();
+
+/**
+  Enable a command line API.
+*/
 program
-  .version('0.0.5')
-  .option('-r, --root <value>', 'Base path, if any, to use for all relative directories')
-  .option('-w, --watch <value>', 'Watch directory for changes to HTML. Can accept multiple', collect_watch_directories, [])
-  .option('-d, --distro <value>', 'Path to distro folder, templates.js')
-  .option('-s, --distro-separate <value>', 'Single JS templates folder')
-  .option('--debug', 'Debugging, default is false', 0)
+  .version('1.0.1');
+
+program  
+  .option('-r, --root <value>', 'Base path, if any, to use for all relative directories', null)
+  .option('-f, --infolder <value>', infolder_text, collect_watchable_dirs, [])
+  .option('-d, --distro <value>', 'Path to distro folder, templates.js, Relative to CWD', null)
+  .option('--debug [opt_value]', 'Debugging, default is false. Full debug = --debug 5', parse_debug_param, 1)
   .option('--silent', 'Quiet output. Forcibly Overrides debug to false.')
-  .option('--only-build', 'Do not watch, only build files. Overrides watch flag.')
-  .parse(process.argv);
+  .option('-A, --disallow_prepopulate', 'Disallow the prepopulation step at init.');
 
+program.command("just-build")
+        .action(action_just_build);
 
+program.command("watch")
+        .option('-s, --distro-separate [value]', 
+                  'Single JS templates folder. Relative to CWD. Templates are written here, then combined.', null)
+        .action(action_watch_and_compile);
 
-const watchable_dirs = program.watch || "js-templates"; // can be array
-console.log("watchable_path", program.watch.length, program.watch);
-const root_dir = program.root || null;
-const separate_compiled_path_str = program.distroSeparate || "js-dist-separate";
-const compiled_path_str = program.distro || "js-dist";
-let default_underscore_template_config = {variable:'data'};
-
-// external packages
-
-
-// paths on filesystem
-// IMPROVE: be smarter, if abs path don't join
-// GLOBALS!
-const base_path = root_dir ? root_dir : path.join(__dirname, "../");
-let watchable_paths = _.map(program.watch, function(name) {
-  return path.join(base_path, name)
-});
-
-// const monitor_path = _pathis(monitor_path_str, base_path);
-// console.log("monitor_path", monitor_path);
-const separate_compiled_path = _pathis(separate_compiled_path_str, base_path);
-const compiled_path = _pathis(compiled_path_str, base_path);
-
-function _pathis(_str, base_path) {
-  return _str.startsWith("/") ? _str : path.join(base_path, _str);
+function parse_silent_param(silent_str, default_val) {
+  if(silent_str === undefined) {
+    return default_val;
+  }
+  return !!(silent_str);
 }
 
-// Quick, Sane, Logs
-function qlog() {
-  if(program.debug) {
-    console.log.apply(console, arguments);  
-  }
+function parse_debug_param(debug_str) {
+  return parseInt(debug_str, 10);
 }
 
 function on_file_write(err) {
   if(err) {
-    qlog("Error on write", err);
+    console.error("Error on write", err);
   }
 }
 
@@ -179,178 +125,267 @@ function html_file_filter(item) {
   return true;
 }
 
-function read_accumulate(_accum, total_cnt, on_complete=null) {
-  let counter = total_cnt;
-  return (item) => {
-    let read_path = path.join(separate_compiled_path, "" + item);
-    fs.readFile(read_path, 'utf8', (err, contents) => {
-      if(err) { 
-        qlog("Error", err); 
-        return; 
-      } 
-      counter -= 1;
-      _accum.push(contents);
-      if(counter <= 0 && _.isFunction(on_complete)) {
-        on_complete(_accum);
-      } 
-    });     
-  }
+function write_combined_templates_file(output_path, multi_template_list) {
+  console.debug("write_combined_templates_file!", multi_template_list.length, output_path);
+  let templates_contents = '/** Auto generated */\n\r;var templates={};\n' + 
+                            multi_template_list.join("\n")+ "\n\r";
+  fs.writeFile(path.join(output_path, "templates.js"), templates_contents, on_file_write);
 }
 
-function accumulator_completed(_accumulated) {
-  qlog("accumulator_completed!", _accumulated.length);
-  let out_str = '/** Auto generated */\n\r;var templates={};\n' + _accumulated.join("\n");
-  fs.writeFile(path.join(compiled_path, "./", "templates.js"), out_str, on_file_write);
+function camelCase(str) {
+  // transform some-value into someValue
+  let splits = str.split("-");
+  return _.reduce(splits, function(memo, word) {
+    return memo + word[0].toUpperCase() + word.slice(1);
+  }) || "";
 }
 
-function on_js_directory_read(err, filenames) {
-  if(err) return;
-  let accumulater = [];
-  
-
-  let filtered = _.filter(filenames, js_file_filter);
-  _.each(filtered, read_accumulate(accumulater, filtered.length, accumulator_completed));  
+// do not include the extension when calling
+function js_safe_filename(str) {
+  return camelCase(str).replace(/[\.+\(\)\/\*\\]+/, '_');
 }
 
-function monitor_and_compile_combined_js(event_type, filename) {
-  return fs.readdir(separate_compiled_path, on_js_directory_read);
-}
-
-function convert_html_to_js(infile, outfile, variable_name) {
-  return function(err, contents) {
-    if(err) {
-      qlog("ERROR!", err);
+function fs_watch_handler(cmd, file_path, _cwd) {
+  return function(event_type, filename) {
+    if(event_type !== 'change' && event_type !== 'rename') {
+      console.debug("Event not change or rename", event_type);
       return;
     }
-    // the actual important part. turn HTML into JS
-    let blob = _.template(contents, default_underscore_template_config).source;
-    fs.writeFile(outfile, 'templates.' + variable_name + "=" + blob, on_file_write);
+    let currfile = path.join(file_path, filename),
+        _parsed = path.parse(currfile), 
+        abs_path_outdir = null, abs_path_outfile;
+    console.debug("fs_watch_handler()\n", currfile, "\nevent\n", event_type+":", filename);
+    if(cmd.distroSeparate) {
+      abs_path_outdir = build_abs_path(cmd.distroSeparate, cmd, _cwd);
+    } else {
+      abs_path_outdir = TEMP_PATH_ABS;
+    }
+    let out_name = js_safe_filename(_parsed.name);
+    abs_path_outfile = path.join(abs_path_outdir, out_name + ".js");
+    console.debug("Writes output\n", abs_path_outfile);
+    return fs.readFile(currfile, 'utf8', function(err, contents) {
+      if(err) {
+        console.error("ERROR!", err);
+        return;
+      }        
+      // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
+      let blob;
+      try {
+         blob = _.template(contents, default_underscore_template_config).source;
+      } catch(e) {
+        console.error("ERROR: file", filename, "Message", e, "Filepath info");
+        throw(e); // HALT! Pointless to continue.
+      } 
+      console.debug("Read Path\n", currfile,
+                    "\nRead Contents\n", contents, 
+                    "\nWrite Path\n", abs_path_outfile, 
+                    "\nWrites", blob);
+      fs.writeFile(abs_path_outfile, 
+                    build_single_template_js_str(_parsed.name, blob),
+                    on_file_write);      
+    }); 
   }
 }
 
-function assemble_filepath(filename) {
-  let data = {};
-  data.filename = "" +filename;
-  data.ext = path.parse(data.filename).ext;
-  data.variable = data.filename.replace(data.ext, '');
+function fs_watch_compiled_separate_handler(cmd, temp_file_path, _cwd) {
+  return function(event_type, filename) {
+    console.log("fs_watch_compiled_separate_handler", event_type);
+    if(event_type !== 'change' && event_type !== 'rename') {
+      console.error("Event not change", event_type, temp_file_path);
+      return;
+    }
 
-  // check file exists 
-  // let confirmed_watchable_paths = _.filter(watchable_paths, function(filepath) {
-  //   if(fs.existsSync(path.join(filepath, filename)) {
-  //     return true;
-  //   }
-  // });
-  
-  data.in = _.chain(watchable_paths).map(function(filepath) {
-    return path.join(filepath, data.filename);
-  }).filter(function(filepath) {
-    return fs.existsSync(filepath);
-  }).value();
+    let currfile = path.join(temp_file_path, filename);
+    console.debug(filename, 
+                  "Changed or renamed. File Path\n", 
+                  temp_file_path);
+    fs.readdir(temp_file_path, function(err, dir_files) {
+      if(err) {
+        console.error("Error with temp dir directory read. ", err);
+        return;
+      }
 
-  // data.in = path.join(monitor_path, data.filename);
-  data.out = path.join(separate_compiled_path, data.variable + ".js");
-  return data;
-}
-
-function monitor_files_and_compile(event_type, filename) {
-  let info = assemble_filepath(filename);
-  if(event_type === 'change') {
-    _.each(info.in, function(currfile) {
-      fs.readFile(currfile, 'utf8', convert_html_to_js(currfile, info.out, info.variable));  
-    })
-    
-  }  
-}
-
-// MONSTER! gross, tear apart to be smaller.
-// remove internal anon funcs
-function on_html_directory_read(err, filenames) {
-  let filtered = _.filter(filenames, html_file_filter);
-  let counter = filtered.length;
-  _.each(filtered, function(filename) {
-    let info = assemble_filepath(filename);
-    _.each(info.in, function(currfile) {
-      fs.readFile(currfile, 'utf8', (err, contents) => {
-        // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
-        let blob;
-        try {
-           blob = _.template(contents, default_underscore_template_config).source;
-        } catch(e) {
-          console.log("ERROR: file", filename, "Message", e, "Filepath info", info);
-          throw(e); // HALT! only important part..
-        }
-        
-        fs.writeFile(info.out, 'templates.' + info.variable + "=" + blob, () => {
-          counter -= 1;
-          if(counter <= 0) {
-            // now build the templates.js file, read single js files, accumulate and print
-            fs.readdir(separate_compiled_path, (err, filenames) => {
-              let filtered = _.filter(filenames, js_file_filter);
-              _.each(filtered, read_accumulate([], filtered.length, accumulator_completed)); 
-            });
-          }
-        });
-      });  
+      console.log("1st 10 directory listing", dir_files.slice(0,10));
+      if(!cmd.disallow_prepopulate) {
+        let filtered = _.filter(dir_files, js_file_filter);
+        populate_converted_html(filtered, cmd, temp_file_path, _cwd);  
+      }
     });
-   
-  });
-}
-
-function process_and_build_all() {
-  // read all files in monitor path
-  _.each(watchable_paths, function(filepath) {
-    fs.readdir(filepath, on_html_directory_read);  
-  })
-  // return fs.readdir(monitor_path, on_html_directory_read);
-}
-
-function guarantee_paths_exist() {
-  // odd... 
-  // _.each(watchable_paths, function(filepath) {
-  //   console.log("watchable_paths", watchable_paths)
-  //   if (!fs.existsSync(filepath)){
-  //     // fs.mkdirSync(filepath);
-  //   }     
-  // });
-  // if (!fs.existsSync(monitor_path)){
-  //   fs.mkdirSync(monitor_path);
-  // }  
-  if (!fs.existsSync(compiled_path)){
-    fs.mkdirSync(compiled_path);
   }
-  if (!fs.existsSync(separate_compiled_path)){
-    fs.mkdirSync(separate_compiled_path);
-  }    
 }
 
 /**
-  1. Watch input files
-  2. Watch JS Separate files
+  Leverage delta only changes for fs.watch events
+  build all files
 */
-function main() {
-  if(program.silent) {
-    program.debug = false;
-  }
-  qlog(
-    "Paths.",
-    "\nMonitor:", watchable_paths,
-    "\nOutput:", compiled_path,
-    "\nRoot path:", root_dir ? root_dir : "Unset",
-    "\nSingle JS files:", separate_compiled_path,
-    "\n"
-  );
-  guarantee_paths_exist();
-  if(program.onlyBuild) {
-    qlog("Will not watch files.");
-    process_and_build_all();
-  } else {
-    _.each(watchable_paths, function(filepath) {
-      fs.watch(filepath, { encoding: 'buffer' },  monitor_files_and_compile);
-    });
-    // fs.watch(monitor_path, { encoding: 'buffer' },  monitor_files_and_compile);
-    fs.watch(separate_compiled_path, { encoding: 'buffer' },  monitor_and_compile_combined_js);    
+function populate_converted_html(html_files_arr, cmd, file_path, _cwd) {
+    let counter = html_files_arr.length;
+    let file_contents_arr = [];
+    if(!cmd.parent.distro) {
+      throw "--distro <folder> required for this step."
+    }
+    console.log("populate_converted_html()", html_files_arr.length, html_files_arr.slice(0,3));
+    return _.chain(html_files_arr).map(function(filename) {
+      return path.join(file_path, filename);
+    }).map(function(abs_path_html_file) {
+      fs.readFile(abs_path_html_file, 'utf8', function(err, contents) {
+        counter -= 1;
+        if(err) {
+          console.error("ERROR: cannot read file", err, abs_path_html_file);
+          return;
+        }
+        file_contents_arr.push(contents);
+        if(counter <= 0) {
+          let abs_out_path = build_abs_path(cmd.parent.distro, cmd, _cwd);
+          guarantee_paths_exist(abs_out_path);
+          console.debug("cmd.parent.distro", cmd.parent.distro, abs_out_path);
+          write_combined_templates_file(abs_out_path, file_contents_arr);
+        }
+      });
+    }).value();
+}
+
+function guarantee_paths_exist(filesystem_path) { 
+  if (!fs.existsSync(filesystem_path)){
+    fs.mkdirSync(filesystem_path, { recursive: true });
   }
 }
 
-main();
+/**
+  version 1.0.1 
+*/
+function action_just_build(cmd) {
+  console.set_debug(cmd.parent.debug);
+  console.set_silent(cmd.parent.silent);
+  console.log("action_just_build()", "cmd.parent.debug", cmd.parent.debug);
+  if(cmd.parent.silent) {
+    console.log("Was silenced!");
+  }
+  let _cwd = process.cwd(), 
+      html_files_contents = [],
+      total_count = 0;
+  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder||cmd.raw);
+  return _.chain(cmd.parent.infolder||cmd.raw).map(function(file_path) {
+    return build_abs_path(file_path, cmd, _cwd);
+  }).each(function(abs_watch_html_path) {
+    fs.readdir(abs_watch_html_path, function(err, dir_files) {
+      if(err) {
+        return;
+      }
+      dir_files = _.filter(dir_files, html_file_filter);
+      total_count += dir_files.length;
+      _.chain(dir_files).map(function(filename) {
+        return path.join(abs_watch_html_path, filename);
+      }).each(function(abs_file_path) {
+        let _parsed = path.parse(abs_file_path);
+        fs.readFile(abs_file_path, 'utf8', function(err, contents) {
+          total_count -= 1;
+          if(err) { console.error("ERROR", err);return; }
+          // need this to be transformed into the template file
+          let blob;
+          try {
+             blob = _.template(contents, default_underscore_template_config).source;
+          } catch(e) {
+            console.error("ERROR: file", filename, "Message", e, "Filepath info");
+            throw(e); // HALT! Pointless to continue.
+          }
+          html_files_contents.push(build_single_template_js_str(_parsed.name, blob));
+          if(total_count <= 0) {
+            console.debug("html_files_contents.length", html_files_contents.length, html_files_contents);
+            let abs_out_path = build_abs_path(cmd.parent.distro, cmd, _cwd);
+            guarantee_paths_exist(abs_out_path);
+            write_combined_templates_file(abs_out_path, html_files_contents);
+          }
+        });
+      }).value();
+    });
+  }).value();
+}
+
+// version 1
+function build_abs_path(file_path, cmd, _cwd) {
+  if(path_abs_regexp.test(file_path)) {
+    return file_path;
+  }
+  if(cmd.parent.root) {
+    return path.join(cmd.parent.root, file_path);
+  } else {
+    return path.join(_cwd, file_path);
+  }  
+}
+
+function action_watch_and_compile(cmd) {
+  console.set_debug(cmd.parent.debug);
+  console.set_silent(cmd.parent.silent);
+  let _cwd = process.cwd();
+  let abs_path_dist_sep = null, abs_path_dist = null;
+  console.debug("action_watch_and_compile", "unmolested path", cmd.parent.infolder);
+  if(cmd.distroSeparate) {
+    console.log("using dist sep %s", cmd.distroSeparate)
+    abs_path_dist_sep = build_abs_path(cmd.distroSeparate, cmd, _cwd);
+    guarantee_paths_exist(abs_path_dist_sep);
+  } else {
+    console.debug("No --distro-separate. Using temp dir", TEMP_PATH_ABS);
+    abs_path_dist_sep = TEMP_PATH_ABS;
+  }
+
+  if(cmd.parent.distro) {
+    console.log("cmd.parent.distro", cmd.parent.distro);
+    abs_path_dist = build_abs_path(cmd.parent.distro, cmd, _cwd);
+    guarantee_paths_exist(abs_path_dist);
+  }
+
+  let abs_paths = _.chain(cmd.parent.infolder).map(function(file_path) {
+    return build_abs_path(file_path, cmd, _cwd);
+  }).each(function(file_path) {
+    // this is the file path of teh watchable directory
+    fs.readdir(file_path, function(err, filenames) {
+      let abs_path_outdir = cmd.distroSeparate ? build_abs_path(cmd.distroSeparate, cmd, _cwd) : TEMP_PATH_ABS;
+      let abs_html_file_paths = _.chain(filenames).map(function(filename) {
+        return path.join(file_path, filename);
+      }).each(function(html_file) {
+        fs.readFile(html_file, 'utf8', function(err, contents) {
+          let blob;
+          try {
+             blob = _.template(contents, default_underscore_template_config).source;
+          } catch(e) {
+            console.error("ERROR: file", html_file, "Message", e);
+            throw(e); // HALT! Pointless to continue.
+          }
+
+          let _parsed = path.parse(html_file);
+          let out_name = js_safe_filename(_parsed.name);
+          let abs_outfile = path.join(abs_path_outdir, out_name + ".js");
+          console.debug("Writing files into", abs_outfile, "raw distro folder", cmd.distroSeparate);
+          if(out_name !== _parsed.name) {
+            console.warn("ALERT: Different name after sanitizing.\n", out_name, "was", _parsed.name);
+          }          
+          fs.writeFile(abs_outfile, build_single_template_js_str(_parsed.name,blob), on_file_write);
+        });
+      }).value()
+    });
+  }).each(function(file_path) {
+    // add the delta listener
+    fs.watch(file_path, {
+      encoding:'utf8'
+    }, fs_watch_handler(cmd, file_path, _cwd));
+  }).value();
+  console.debug("Absolute paths\n", abs_paths, "\nwatched.", "\nWrite to folder\n", abs_path_dist_sep);
+  fs.watch(abs_path_dist_sep, {
+    encoding:'utf8'
+  }, fs_watch_compiled_separate_handler(cmd, abs_path_dist_sep, _cwd));
+}
+
+function build_single_template_js_str(name, contents) {
+  let safe_name = js_safe_filename(name);
+  return 'templates.' + safe_name + "=" + contents;
+}
+
+function init() {
+  if(require.main === module) {
+    program.parse(process.argv);
+  }
+}
+
+init();
 
