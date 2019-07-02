@@ -227,7 +227,7 @@ function populate_converted_html(html_files_arr, cmd, file_path, _cwd) {
     }).value();
 }
 
-function guarantee_paths_exist(filesystem_path) { 
+function guarantee_path_exists(filesystem_path) { 
   if (!fs.existsSync(filesystem_path)){
     fs.mkdirSync(filesystem_path, { recursive: true });
   }
@@ -246,8 +246,8 @@ function action_just_build(cmd) {
       meta = new FileReadMeta,
       abs_outpath = build_abs_path(_distro, cmd, _cwd);
 
-  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder||cmd.raw);
-  return _.chain(cmd.parent.infolder||cmd.raw).map(function(file_path) {
+  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder);
+  return _.chain(cmd.parent.infolder).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
   }).each(function(abs_infolder_path) {
     fs.readdir(abs_infolder_path, function(err, dir_files) {
@@ -280,8 +280,9 @@ class FileReadMeta extends Object {
 
 /**
   Accumulate all parsed, transformed, file contents --> templates.js
+  Does not store any values to distro-separate folder.
 
-  Checks FileReadMeta count. accumulates to array in FileReadMeta
+  Uses: 'just-build'
 */
 function on_fileread_accumulate(abs_filepath, abs_outpath, files_meta) {
   let _parsed = path.parse(abs_filepath);
@@ -300,11 +301,8 @@ function on_fileread_accumulate(abs_filepath, abs_outpath, files_meta) {
     }
     files_meta.accumulator.push(build_single_template_js_str(_parsed.name, blob));
     if(files_meta.count <= 0) {
-      /** all or nothing isn't strictly needed. it does preserve 
-        any existing templates.js until it can be successfully
-        completed. */
       console.debug("files_meta.accumulator.length", files_meta.accumulator.length, "Sample", _.first(files_meta.accumulator));
-      guarantee_paths_exist(abs_outpath);
+      guarantee_path_exists(abs_outpath);
       write_combined_templates_file(abs_outpath, files_meta.accumulator);
     }
   }
@@ -323,7 +321,7 @@ function build_abs_path(file_path, cmd, _cwd) {
   }  
 }
 
-// TODO. make this composable. 
+
 function action_watch_and_compile(cmd) {
   console.set_debug(cmd.parent.debug);
   console.set_silent(cmd.parent.silent);
@@ -334,7 +332,7 @@ function action_watch_and_compile(cmd) {
   if(cmd.distroSeparate) {
     console.log("using dist sep %s", cmd.distroSeparate)
     abs_path_dist_sep = build_abs_path(cmd.distroSeparate, cmd, _cwd);
-    guarantee_paths_exist(abs_path_dist_sep);
+    guarantee_path_exists(abs_path_dist_sep);
   } else {
     abs_path_dist_sep = TEMP_PATH_ABS;
     console.debug("No --distro-separate","Using temp dir for distro separate path", TEMP_PATH_ABS);
@@ -343,7 +341,7 @@ function action_watch_and_compile(cmd) {
   if(cmd.parent.distro) {
     console.log("cmd.parent.distro", cmd.parent.distro);
     abs_path_dist = build_abs_path(cmd.parent.distro, cmd, _cwd);
-    guarantee_paths_exist(abs_path_dist);
+    guarantee_path_exists(abs_path_dist);
   }
 
   let abs_paths = _.chain(cmd.parent.infolder).map(function(file_path) {
@@ -380,9 +378,9 @@ function on_fileread_single(html_filepath, abs_separate_distro ) {
       console.error("ERROR: file", html_filepath, "Message", e);
       throw(e); // HALT! Pointless to continue.
     }
-    let _parsed = path.parse(html_filepath);
-    let out_name = js_safe_filename(_parsed.name);
-    let abs_outfile = path.join(abs_separate_distro, out_name + ".js");
+    let _parsed = path.parse(html_filepath),
+        out_name = js_safe_filename(_parsed.name),
+        abs_outfile = path.join(abs_separate_distro, out_name + ".js");
     console.debug("Write dir, distro-separate:", abs_separate_distro,
                   "Write single file:", abs_outfile);
     if(out_name !== _parsed.name) {
