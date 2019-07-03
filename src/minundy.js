@@ -20,14 +20,14 @@
 
   Much like other configurable build systems, this 
   script concatenates files together. To improve speed,
-  this scrpit keeps an intermediary step folder, processing HTML to JS into a `js-dist-separate/` 
+  this script keeps an intermediary step folder, processing HTML to JS into a `js-dist-separate/` 
   folder, which could be a temporary system folder. 
   Then, watching this intermediary folder for changes, via fs.watch, which lets deltas be tracked and updated. 
 
   On file change and rename, all JS files
   in `--distro-separate` are built and combined into templates.js
 
-  ## ASCI Visualization. Watch folder --> temp folder / distro separate --> single templates.js
+  ## ASCII Visualization. Watch folder --> temp folder / distro separate --> single templates.js
 
   .html --> .js -> |
   .html --> .js -> | (*.js) ---> templates.js
@@ -53,9 +53,10 @@ const fs = require("fs");
 const _ = require("underscore");
 const path_abs_regexp = /^\//;
 const console = require("logdebug.js");
+let DEFAULT_UNDERSCORE_TEMPLATE_CONFIG = {variable:'data'};
 const infolder_text = 'Input directory to serve as for changes to HTML. ' 
-                        + 'Can accept multiple --infolder. Paths are relative to CWD';
-let default_underscore_template_config = {variable:'data'};
+                        + 'Can accept multiple --infolder. '
+                        + 'Relative paths are relative to CWD';
 
 function collect_watchable_dirs(filepath, memo) {
   memo.push(filepath);
@@ -78,7 +79,7 @@ const TEMP_PATH_ABS = generate_temp_dir();
   Enable a command line API.
 */
 program
-  .version('1.0.1');
+  .version('1.0.2');
 
 program  
   .option('-r, --root <value>', 'Base path, if any, to use for all relative directories', null)
@@ -92,7 +93,7 @@ program.command("just-build")
         .action(action_just_build);
 
 program.command("watch")
-        .option('-s, --distro-separate [value]', 
+        .option('-s, --distro-separate <value>', 
                   'Single JS templates folder. Relative to CWD. Templates are written here, then combined.', null)
         .action(action_watch_and_compile);
 
@@ -113,22 +114,18 @@ function on_file_write(err) {
   }
 }
 
-function js_file_filter(item) {
+function ext_filter(ext_name) {
+  return function(item) {
   let ext_type = path.extname(item);
-  if(ext_type.indexOf("js") < 0) return false;
-  return true;  
-}
-
-function html_file_filter(item) {
-  let ext_type = path.extname(item);
-  if(ext_type.indexOf("html") < 0) return false;
-  return true;
+  if(ext_type.indexOf(ext_name) < 0) return false;
+  return true;      
+  }
 }
 
 function write_combined_templates_file(output_path, multi_template_list) {
   console.debug("write_combined_templates_file!", multi_template_list.length, output_path);
   let templates_contents = '/** Auto generated */\n\r;var templates={};\n' + 
-                            multi_template_list.join("\n")+ "\n\r";
+                            multi_template_list.join("\n") + "\n\r";
   fs.writeFile(path.join(output_path, "templates.js"), templates_contents, on_file_write);
 }
 
@@ -141,8 +138,9 @@ function camelCase(str) {
 }
 
 // do not include the extension when calling
+const whitelist_regexp_negated = /[^a-zA-Z0-9-_, ]{1,}/;
 function js_safe_filename(str) {
-  return camelCase(str).replace(/[\.+\(\)\/\*\\]+/, '_');
+  return camelCase(str).replace(whitelist_regexp_negated, '');
 }
 
 function fs_watch_handler(cmd, file_path, _cwd) {
@@ -171,7 +169,7 @@ function fs_watch_handler(cmd, file_path, _cwd) {
       // the actual important part. Turn HTML into JS. Compile. Convert. Transform.
       let blob;
       try {
-         blob = _.template(contents, default_underscore_template_config).source;
+         blob = _.template(contents, DEFAULT_UNDERSCORE_TEMPLATE_CONFIG).source;
       } catch(e) {
         console.error("ERROR: file", filename, "Message", e, "Filepath info");
         throw(e); // HALT! Pointless to continue.
@@ -189,9 +187,8 @@ function fs_watch_handler(cmd, file_path, _cwd) {
 
 function fs_watch_compiled_separate_handler(cmd, temp_file_path, _cwd) {
   return function(event_type, filename) {
-    console.log("fs_watch_compiled_separate_handler", event_type);
     if(event_type !== 'change' && event_type !== 'rename') {
-      console.error("Event not change", event_type, temp_file_path);
+      console.debug("Event not change", event_type, temp_file_path);
       return;
     }
 
@@ -207,103 +204,113 @@ function fs_watch_compiled_separate_handler(cmd, temp_file_path, _cwd) {
 
       console.log("1st 10 directory listing", dir_files.slice(0,10));
       if(!cmd.disallow_prepopulate) {
-        let filtered = _.filter(dir_files, js_file_filter);
+        let filtered = _.filter(dir_files, ext_filter('js'));
         populate_converted_html(filtered, cmd, temp_file_path, _cwd);  
       }
     });
   }
 }
 
-/**
-  Leverage delta only changes for fs.watch events
-  build all files
-*/
 function populate_converted_html(html_files_arr, cmd, file_path, _cwd) {
-    let counter = html_files_arr.length;
-    let file_contents_arr = [];
-    if(!cmd.parent.distro) {
-      throw "--distro <folder> required for this step."
+    let _distro = cmd.parent.distro,
+        meta = new FileReadMeta,
+        abs_out_path = build_abs_path(_distro, cmd, _cwd);
+    if(!_distro) {
+      throw "--distro <folder> required. Not found cmd.parent.distro"
     }
-    console.log("populate_converted_html()", html_files_arr.length, html_files_arr.slice(0,3));
+    console.log("populate_converted_html()", html_files_arr.length);
+    console.debug("HTML Files to be read (15 max)", html_files_arr.slice(0,3))
     return _.chain(html_files_arr).map(function(filename) {
       return path.join(file_path, filename);
     }).map(function(abs_path_html_file) {
-      fs.readFile(abs_path_html_file, 'utf8', function(err, contents) {
-        counter -= 1;
-        if(err) {
-          console.error("ERROR: cannot read file", err, abs_path_html_file);
-          return;
-        }
-        file_contents_arr.push(contents);
-        if(counter <= 0) {
-          let abs_out_path = build_abs_path(cmd.parent.distro, cmd, _cwd);
-          guarantee_paths_exist(abs_out_path);
-          console.debug("cmd.parent.distro", cmd.parent.distro, abs_out_path);
-          write_combined_templates_file(abs_out_path, file_contents_arr);
-        }
-      });
+      fs.readFile(abs_path_html_file, 'utf8', on_fileread_accumulate(abs_path_html_file, abs_out_path, meta));
     }).value();
 }
 
-function guarantee_paths_exist(filesystem_path) { 
+function guarantee_path_exists(filesystem_path) { 
   if (!fs.existsSync(filesystem_path)){
     fs.mkdirSync(filesystem_path, { recursive: true });
   }
 }
 
-/**
-  version 1.0.1 
-*/
 function action_just_build(cmd) {
   console.set_debug(cmd.parent.debug);
   console.set_silent(cmd.parent.silent);
   console.log("action_just_build()", "cmd.parent.debug", cmd.parent.debug);
-  if(cmd.parent.silent) {
-    console.log("Was silenced!");
+  if(!cmd.parent.silent) {
+    console.log("Tip: Use `--silent` to stop log debugging output.");
   }
   let _cwd = process.cwd(), 
       html_files_contents = [],
-      total_count = 0;
-  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder||cmd.raw);
-  return _.chain(cmd.parent.infolder||cmd.raw).map(function(file_path) {
+      _distro = cmd.parent.distro,
+      meta = new FileReadMeta,
+      abs_outpath = build_abs_path(_distro, cmd, _cwd);
+
+  console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder);
+  return _.chain(cmd.parent.infolder).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
-  }).each(function(abs_watch_html_path) {
-    fs.readdir(abs_watch_html_path, function(err, dir_files) {
+  }).each(function(abs_infolder_path) {
+    fs.readdir(abs_infolder_path, function(err, dir_files) {
       if(err) {
         return;
       }
-      dir_files = _.filter(dir_files, html_file_filter);
-      total_count += dir_files.length;
-      _.chain(dir_files).map(function(filename) {
-        return path.join(abs_watch_html_path, filename);
-      }).each(function(abs_file_path) {
-        let _parsed = path.parse(abs_file_path);
-        fs.readFile(abs_file_path, 'utf8', function(err, contents) {
-          total_count -= 1;
-          if(err) { console.error("ERROR", err);return; }
-          // need this to be transformed into the template file
-          let blob;
-          try {
-             blob = _.template(contents, default_underscore_template_config).source;
-          } catch(e) {
-            console.error("ERROR: file", filename, "Message", e, "Filepath info");
-            throw(e); // HALT! Pointless to continue.
-          }
-          html_files_contents.push(build_single_template_js_str(_parsed.name, blob));
-          if(total_count <= 0) {
-            console.debug("html_files_contents.length", html_files_contents.length, html_files_contents);
-            let abs_out_path = build_abs_path(cmd.parent.distro, cmd, _cwd);
-            guarantee_paths_exist(abs_out_path);
-            write_combined_templates_file(abs_out_path, html_files_contents);
-          }
-        });
+      dir_files = _.filter(dir_files, ext_filter('html'));
+      meta.count += dir_files.length;
+      _.chain(dir_files).map(abs_path_map(abs_infolder_path)).each(function(abs_filepath) {
+        fs.readFile(abs_filepath, 
+                     'utf8', 
+                     on_fileread_accumulate(abs_filepath, abs_outpath, meta));
       }).value();
     });
   }).value();
 }
+function abs_path_map(abs_infolder_path) {
+  return function(filename) {
+    return path.join(abs_infolder_path, filename);
+  }  
+}
 
-// version 1
+class FileReadMeta extends Object {
+  constructor(options={}) {
+    super(options);
+    this.count = 0;
+    this.accumulator = [];
+  }
+}
+
+/**
+  Accumulate all parsed, transformed, file contents --> templates.js
+  Does not store any values to distro-separate folder.
+
+  Uses: 'just-build'
+*/
+function on_fileread_accumulate(abs_filepath, abs_outpath, files_meta) {
+  let _parsed = path.parse(abs_filepath);
+  return function(err, contents) {
+    files_meta.count -= 1;
+    if(err) { 
+      console.error("ERROR while fs.readFile", err); 
+      throw "Filesystem error."; 
+    }
+    let blob = null;
+    try {
+       blob = _.template(contents, DEFAULT_UNDERSCORE_TEMPLATE_CONFIG).source;
+    } catch(e) {
+      console.error("ERROR: file", _parsed.name, "Message", e);
+      throw(e); // HALT! Pointless to continue.
+    }
+    files_meta.accumulator.push(build_single_template_js_str(_parsed.name, blob));
+    if(files_meta.count <= 0) {
+      console.debug("files_meta.accumulator.length", files_meta.accumulator.length, "Sample", _.first(files_meta.accumulator));
+      guarantee_path_exists(abs_outpath);
+      write_combined_templates_file(abs_outpath, files_meta.accumulator);
+    }
+  }
+}
+
 function build_abs_path(file_path, cmd, _cwd) {
+  // this knows the structure of commanderjs
+  // TODO: should, instead, be explicit root path.
   if(path_abs_regexp.test(file_path)) {
     return file_path;
   }
@@ -318,21 +325,22 @@ function action_watch_and_compile(cmd) {
   console.set_debug(cmd.parent.debug);
   console.set_silent(cmd.parent.silent);
   let _cwd = process.cwd();
-  let abs_path_dist_sep = null, abs_path_dist = null;
+  let abs_path_dist_sep = null, 
+       abs_path_dist = null;
   console.debug("action_watch_and_compile", "unmolested path", cmd.parent.infolder);
   if(cmd.distroSeparate) {
     console.log("using dist sep %s", cmd.distroSeparate)
     abs_path_dist_sep = build_abs_path(cmd.distroSeparate, cmd, _cwd);
-    guarantee_paths_exist(abs_path_dist_sep);
+    guarantee_path_exists(abs_path_dist_sep);
   } else {
-    console.debug("No --distro-separate. Using temp dir", TEMP_PATH_ABS);
     abs_path_dist_sep = TEMP_PATH_ABS;
+    console.debug("No --distro-separate","Using temp dir for distro separate path", TEMP_PATH_ABS);
   }
 
   if(cmd.parent.distro) {
     console.log("cmd.parent.distro", cmd.parent.distro);
     abs_path_dist = build_abs_path(cmd.parent.distro, cmd, _cwd);
-    guarantee_paths_exist(abs_path_dist);
+    guarantee_path_exists(abs_path_dist);
   }
 
   let abs_paths = _.chain(cmd.parent.infolder).map(function(file_path) {
@@ -344,36 +352,41 @@ function action_watch_and_compile(cmd) {
       let abs_html_file_paths = _.chain(filenames).map(function(filename) {
         return path.join(file_path, filename);
       }).each(function(html_file) {
-        fs.readFile(html_file, 'utf8', function(err, contents) {
-          let blob;
-          try {
-             blob = _.template(contents, default_underscore_template_config).source;
-          } catch(e) {
-            console.error("ERROR: file", html_file, "Message", e);
-            throw(e); // HALT! Pointless to continue.
-          }
-
-          let _parsed = path.parse(html_file);
-          let out_name = js_safe_filename(_parsed.name);
-          let abs_outfile = path.join(abs_path_outdir, out_name + ".js");
-          console.debug("Writing files into", abs_outfile, "raw distro folder", cmd.distroSeparate);
-          if(out_name !== _parsed.name) {
-            console.warn("ALERT: Different name after sanitizing.\n", out_name, "was", _parsed.name);
-          }          
-          fs.writeFile(abs_outfile, build_single_template_js_str(_parsed.name,blob), on_file_write);
-        });
-      }).value()
+        fs.readFile(html_file, 'utf8', on_fileread_single(html_file, abs_path_outdir));
+      }).value();
     });
   }).each(function(file_path) {
-    // add the delta listener
+    // add the file delta listener (handler)
     fs.watch(file_path, {
       encoding:'utf8'
     }, fs_watch_handler(cmd, file_path, _cwd));
   }).value();
-  console.debug("Absolute paths\n", abs_paths, "\nwatched.", "\nWrite to folder\n", abs_path_dist_sep);
+  console.debug("Absolute paths\n", JSON.stringify(abs_paths, null, 4), "\nwatched.");
+  console.debug("Will listen, tmpl single file\n", abs_path_dist_sep);
   fs.watch(abs_path_dist_sep, {
     encoding:'utf8'
   }, fs_watch_compiled_separate_handler(cmd, abs_path_dist_sep, _cwd));
+}
+
+function on_fileread_single(html_filepath, abs_separate_distro ) {
+  return function(err, contents) {
+    let blob;
+    try {
+       blob = _.template(contents, DEFAULT_UNDERSCORE_TEMPLATE_CONFIG).source;
+    } catch(e) {
+      console.error("ERROR: file", html_filepath, "Message", e);
+      throw(e); // HALT! Pointless to continue.
+    }
+    let _parsed = path.parse(html_filepath),
+        out_name = js_safe_filename(_parsed.name),
+        abs_outfile = path.join(abs_separate_distro, out_name + ".js");
+    console.debug("Write dir, distro-separate:", abs_separate_distro,
+                  "Write single file:", abs_outfile);
+    if(out_name !== _parsed.name) {
+      console.warn("ALERT: Different name after sanitizing.\n", out_name, "was", _parsed.name);
+    }
+    fs.writeFile(abs_outfile, build_single_template_js_str(_parsed.name, blob), on_file_write);
+  }
 }
 
 function build_single_template_js_str(name, contents) {
