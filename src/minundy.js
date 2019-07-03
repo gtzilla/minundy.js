@@ -321,7 +321,6 @@ function build_abs_path(file_path, cmd, _cwd) {
   }  
 }
 
-
 function action_watch_and_compile(cmd) {
   console.set_debug(cmd.parent.debug);
   console.set_silent(cmd.parent.silent);
