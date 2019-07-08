@@ -10,7 +10,7 @@ Works with yarn, npm and probably* any other known build system in 2018/2019
 
 # minundy.js
 
-The current version is 1.0.2
+The current version is 1.0.3
 
 minimal underscore.js templates build tool. Minimal Underscore Template Build System.
 
@@ -19,8 +19,7 @@ and writes to a single JavaScript object, output as JSON to file`templates.js`
 
 ## Dependencies
 
-Minimal dependencies. Primarily, underscore.js, which has the template engine. The second dependency is the Command Line Utility `commanderjs`. logdebug.js, which powers logging has been split out
-away from this project. This may change.
+Minimal dependencies. Primarily, underscore.js, which has the template engine. The second dependency is the Command Line Utility `commanderjs`. `colorlogjs`, which powers logging.
 
 
 ## Works With
@@ -89,7 +88,7 @@ get all messages, including `console.debug`
 + Relative to CWD at execution time, not script location
 + Renamed `--watch` to `--infolder` 
 + Automatic absolute path checking and preservation `--distro /var/app/location --infolder some/relative/location` 
-+ logging verbosity support via `logdebug.js`
++ logging verbosity support via `colorlogjs`
 
 ## Distrubtion via yarn, npm and Github
 

@@ -52,7 +52,11 @@ const os = require("os");
 const fs = require("fs");
 const _ = require("underscore");
 const path_abs_regexp = /^\//;
-const console = require("logdebug.js");
+const colorlogjs = require("colorlogjs");
+const console = colorlogjs.start(__filename, {
+  log_level:6,
+  is_silent:false,
+});
 let DEFAULT_UNDERSCORE_TEMPLATE_CONFIG = {variable:'data'};
 const infolder_text = 'Input directory to serve as for changes to HTML. ' 
                         + 'Can accept multiple --infolder. '
@@ -79,7 +83,7 @@ const TEMP_PATH_ABS = generate_temp_dir();
   Enable a command line API.
 */
 program
-  .version('1.0.2');
+  .version('1.0.3');
 
 program  
   .option('-r, --root <value>', 'Base path, if any, to use for all relative directories', null)
@@ -362,7 +366,7 @@ function action_watch_and_compile(cmd) {
     }, fs_watch_handler(cmd, file_path, _cwd));
   }).value();
   console.debug("Absolute paths\n", JSON.stringify(abs_paths, null, 4), "\nwatched.");
-  console.debug("Will listen, tmpl single file\n", abs_path_dist_sep);
+  console.debug("Will listen, temporary single file\n", abs_path_dist_sep);
   fs.watch(abs_path_dist_sep, {
     encoding:'utf8'
   }, fs_watch_compiled_separate_handler(cmd, abs_path_dist_sep, _cwd));

@@ -1,6 +1,6 @@
 {
   "name": "minundy.js",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Minimal Underscore Template Build System -> min und -> minundy.js. Manages pre-building JS/HTML templates using underscore.js",
   "main": "src/minundy.js",
   "author": "gtzilla <gregory.tomlinson@gmail.com>",
@@ -12,16 +12,16 @@
     "url": "git@github.com:gtzilla/minundy.js.git"
   },
   "dependencies": {
+    "colorlogjs": "^0.2.3",
     "commander": "^2.15.1",
-    "logdebug.js": "^0.0.2",
     "underscore": "1.9.0"
   },
   "engines": {
     "node": ">=10.0.0"
   },
   "scripts": {
-      "watch":"node node_modules/minundy.js/src/minundy.js watch --infolder test/sample/html"
-    },
+    "watch": "node node_modules/minundy.js/src/minundy.js watch --infolder test/sample/html"
+  },
   "devDependencies": {
     "commander": "^2.15.1",
     "node": "^10.0.0"
