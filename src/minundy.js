@@ -54,11 +54,11 @@ const _ = require("underscore");
 const path_abs_regexp = /^\//;
 const colorlogjs = require("colorlogjs");
 const console = colorlogjs.start(__filename, {
-  log_level:6,
+  log_level:1,
   is_silent:false,
 });
 let DEFAULT_UNDERSCORE_TEMPLATE_CONFIG = {variable:'data'};
-const infolder_text = 'Input directory to serve as for changes to HTML. ' 
+const infolder_text = 'Input directory to watch for changes to HTML. ' 
                         + 'Can accept multiple --infolder. '
                         + 'Relative paths are relative to CWD';
 
@@ -87,10 +87,10 @@ program
 
 program  
   .option('-r, --root <value>', 'Base path, if any, to use for all relative directories', null)
-  .option('-f, --infolder <value>', infolder_text, collect_watchable_dirs, [])
+  .option('-f, --infolder <value>',  infolder_text, collect_watchable_dirs, [])
   .option('-d, --distro <value>', 'Path to distro folder, templates.js, Relative to CWD', null)
-  .option('--debug [opt_value]', 'Debugging, default is false. Full debug = --debug 5', parse_debug_param, 1)
-  .option('--silent', 'Quiet output. Forcibly Overrides debug to false.')
+  .option('--debug [opt_value]', 'Debugging, default is lowest, 1. Full debug = --debug 5', parse_debug_param, 1)
+  .option('--silent', 'Quiet output. Forcibly Overrides debug to silence')
   .option('-A, --disallow_prepopulate', 'Disallow the prepopulation step at init.');
 
 program.command("just-build")
@@ -127,7 +127,6 @@ function ext_filter(ext_name) {
 }
 
 function write_combined_templates_file(output_path, multi_template_list) {
-  console.debug("write_combined_templates_file!", multi_template_list.length, output_path);
   let templates_contents = '/** Auto generated */\n\r;var templates={};\n' + 
                             multi_template_list.join("\n") + "\n\r";
   fs.writeFile(path.join(output_path, "templates.js"), templates_contents, on_file_write);
@@ -206,7 +205,7 @@ function fs_watch_compiled_separate_handler(cmd, temp_file_path, _cwd) {
         return;
       }
 
-      console.log("1st 10 directory listing", dir_files.slice(0,10));
+      console.debug("1st 10 directory listing", dir_files.slice(0,10));
       if(!cmd.disallow_prepopulate) {
         let filtered = _.filter(dir_files, ext_filter('js'));
         populate_converted_html(filtered, cmd, temp_file_path, _cwd);  
@@ -223,7 +222,7 @@ function populate_converted_html(html_files_arr, cmd, file_path, _cwd) {
       throw "--distro <folder> required. Not found cmd.parent.distro"
     }
     console.log("populate_converted_html()", html_files_arr.length);
-    console.debug("HTML Files to be read (15 max)", html_files_arr.slice(0,3))
+    // console.debug("HTML Files to be read (15 max)", html_files_arr.slice(0,3))
     return _.chain(html_files_arr).map(function(filename) {
       return path.join(file_path, filename);
     }).map(function(abs_path_html_file) {
@@ -240,7 +239,7 @@ function guarantee_path_exists(filesystem_path) {
 function action_just_build(cmd) {
   console.set_debug(cmd.parent.debug);
   console.set_silent(cmd.parent.silent);
-  console.log("action_just_build()", "cmd.parent.debug", cmd.parent.debug);
+  console.debug("action_just_build()", "cmd.parent.debug", cmd.parent.debug);
   if(!cmd.parent.silent) {
     console.log("Tip: Use `--silent` to stop log debugging output.");
   }
@@ -249,7 +248,7 @@ function action_just_build(cmd) {
       _distro = cmd.parent.distro,
       meta = new FileReadMeta,
       abs_outpath = build_abs_path(_distro, cmd, _cwd);
-
+      
   console.debug("Only Build. Will not WATCH.", "CWD directory", _cwd, cmd.parent.infolder);
   return _.chain(cmd.parent.infolder).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
@@ -295,15 +294,8 @@ function on_fileread_accumulate(abs_filepath, abs_outpath, files_meta) {
     if(err) { 
       console.error("ERROR while fs.readFile", err); 
       throw "Filesystem error."; 
-    }
-    let blob = null;
-    try {
-       blob = _.template(contents, DEFAULT_UNDERSCORE_TEMPLATE_CONFIG).source;
-    } catch(e) {
-      console.error("ERROR: file", _parsed.name, "Message", e);
-      throw(e); // HALT! Pointless to continue.
-    }
-    files_meta.accumulator.push(build_single_template_js_str(_parsed.name, blob));
+    }    
+    files_meta.accumulator.push(build_single_template_js_str(_parsed.name, contents));
     if(files_meta.count <= 0) {
       console.debug("files_meta.accumulator.length", files_meta.accumulator.length, "Sample", _.first(files_meta.accumulator));
       guarantee_path_exists(abs_outpath);
@@ -331,9 +323,7 @@ function action_watch_and_compile(cmd) {
   let _cwd = process.cwd();
   let abs_path_dist_sep = null, 
        abs_path_dist = null;
-  console.debug("action_watch_and_compile", "unmolested path", cmd.parent.infolder);
   if(cmd.distroSeparate) {
-    console.log("using dist sep %s", cmd.distroSeparate)
     abs_path_dist_sep = build_abs_path(cmd.distroSeparate, cmd, _cwd);
     guarantee_path_exists(abs_path_dist_sep);
   } else {
@@ -342,17 +332,17 @@ function action_watch_and_compile(cmd) {
   }
 
   if(cmd.parent.distro) {
-    console.log("cmd.parent.distro", cmd.parent.distro);
     abs_path_dist = build_abs_path(cmd.parent.distro, cmd, _cwd);
     guarantee_path_exists(abs_path_dist);
   }
 
+  let abs_path_outdir = cmd.distroSeparate ? build_abs_path(cmd.distroSeparate, cmd, _cwd) : TEMP_PATH_ABS;
   let abs_paths = _.chain(cmd.parent.infolder).map(function(file_path) {
     return build_abs_path(file_path, cmd, _cwd);
   }).each(function(file_path) {
-    // this is the file path of teh watchable directory
+    // this is the file path of teh watchable HTML, raw directory
+
     fs.readdir(file_path, function(err, filenames) {
-      let abs_path_outdir = cmd.distroSeparate ? build_abs_path(cmd.distroSeparate, cmd, _cwd) : TEMP_PATH_ABS;
       let abs_html_file_paths = _.chain(filenames).map(function(filename) {
         return path.join(file_path, filename);
       }).each(function(html_file) {
