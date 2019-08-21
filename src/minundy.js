@@ -226,6 +226,7 @@ function populate_converted_html(html_files_arr, cmd, file_path, _cwd) {
     return _.chain(html_files_arr).map(function(filename) {
       return path.join(file_path, filename);
     }).map(function(abs_path_html_file) {
+      // this should use streaming.
       fs.readFile(abs_path_html_file, 'utf8', on_fileread_accumulate(abs_path_html_file, abs_out_path, meta));
     }).value();
 }
@@ -260,12 +261,37 @@ function action_just_build(cmd) {
       dir_files = _.filter(dir_files, ext_filter('html'));
       meta.count += dir_files.length;
       _.chain(dir_files).map(abs_path_map(abs_infolder_path)).each(function(abs_filepath) {
+        console.log("abs_filepath", abs_filepath);
         fs.readFile(abs_filepath, 
                      'utf8', 
-                     on_fileread_accumulate(abs_filepath, abs_outpath, meta));
+                     on_fileread_parse_and_accumulate(abs_filepath, abs_outpath, meta));
       }).value();
     });
   }).value();
+}
+function on_fileread_parse_and_accumulate(abs_filepath, abs_outpath, meta) {
+  // messy
+  let _parsed = path.parse(abs_filepath);
+  return function(err, contents) {
+    meta.count -= 1;
+    if(err) { 
+      console.error("ERROR while fs.readFile", err); 
+      throw "Filesystem error."; 
+    }    
+    let blob;
+    try {
+       blob = _.template(contents, DEFAULT_UNDERSCORE_TEMPLATE_CONFIG).source;
+    } catch(e) {
+      console.error("ERROR: file", html_filepath, "Message", e);
+      throw(e); // HALT! Pointless to continue.
+    }    
+    meta.accumulator.push(build_single_template_js_str(_parsed.name, blob));
+    if(meta.count <= 0) {
+      console.debug("meta.accumulator.length", meta.accumulator.length, "Sample", _.first(meta.accumulator));
+      guarantee_path_exists(abs_outpath);
+      write_combined_templates_file(abs_outpath, meta.accumulator);
+    }
+  }  
 }
 function abs_path_map(abs_infolder_path) {
   return function(filename) {
