@@ -6,6 +6,7 @@ const shell = require("shelljs");
 const os = require("os");
 const _ = require("underscore");
 const {pipeline,Transform,Readable,Duplux,Writeable,finished} = require("stream");
+const {ObjectToStringer} = require("../src/utils.js");
 
 function initializeTmpFolderWithFiles(tmp_prefix=null) {
 
@@ -32,7 +33,7 @@ function delete_files(folder, names, done) {
 }
 
 
-test('DirectoryCommander makes a readable', function(done) {
+test('DirectoryCommander makes a readable', async function(done) {
   const tmp_prefix =  "DirectoryCommander-test-dir";
   let directoryCommander = new DirectoryCommander;
 
@@ -51,21 +52,33 @@ test('DirectoryCommander makes a readable', function(done) {
     encoding:'utf8'
   }];
 
-  pipeline(
-    directoryCommander.readable_filelist_from_filepath(created_path),
-    process.stdout,
-    (err)=>{
-      if(err) {
-        console.error("ouch! error", err);
-      }
-      console.log("pipeline all done, read files.")
-    }
-    )
+  // console.log("The tree is", tree);
+  _.each(tree, function(meta) {
+    console.log("Setup test. Make files to read... name is", meta.name)
+    let filePath = join(created_path, meta.name);
+    fs.writeFileSync(filePath, meta.contents, {encoding: meta.encoding, flag:'w'});
+  });
+  // END setup... move this elsewhere once you can share variables.
+  let contents = await directoryCommander.awaitReaddir(created_path);
+  console.log("directoryCommander", "contents", contents, created_path);
+  expect(contents.length).toBe(tree.length);
+  let _first_filename = _.first(contents);
+  let _first_tree = _.first(tree);
+  expect(_first_filename).toBe(_first_tree.name);
+
+  // pipeline(
+  //   directoryCommander.filesStreambyFilepath(created_path),
+  //   new ObjectToStringer(),
+  //   process.stderr,
+  //   (err)=>{
+  //     if(err) {
+  //       console.error("ouch! error", err);
+  //     }
+  //     console.log("pipeline all done, read files.")
+  //   }
+  //   )
   
 
-  _.each(tree, function(meta) {
-    fs.writeFileSync(join(created_path, meta.name), meta.contents, meta.encoding);
-  });
 
   delete_files(created_path, _.pluck(tree, 'name'), done);
   expect(directoryCommander).not.toBeNull();
