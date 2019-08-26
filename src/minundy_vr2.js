@@ -14,10 +14,10 @@ if(require.main !== module) {
 }
 
 function default_action(opts) {
-  console.log("thin build", opts);
-  let inst = new DirectoryCommander();
-  console.log("handling the directory", _.isFunction(DirectoryCommander.prototype.handleResponse));  
-  fs.readdir('.', DirectoryCommander.prototype.handleResponse);
+  // console.log("thin build", opts);
+  // let inst = new DirectoryCommander();
+  // console.log("handling the directory", _.isFunction(DirectoryCommander.prototype.handleResponse));  
+  // fs.readdir('.', DirectoryCommander.prototype.handleResponse);
 }
 
 program.version('1.5.1')

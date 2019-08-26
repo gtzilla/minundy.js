@@ -1,7 +1,4 @@
 'use strict';
-(async function() {
-
-
 
 const _ = require("underscore");
 const {join} = require("path");
@@ -21,7 +18,7 @@ class DirectoryCommander extends Readable {
     return Readable.from(filelist_generator(filepath));
   }
   async awaitReaddir(dirPath) {
-    console.log("filesStreambyFilepath checking directory", dirPath);
+    console.log("async awaitReaddir", dirPath);
     let active = new ReadWrap(dirPath);
     return await active.readdir(dirPath);
   }
@@ -31,6 +28,3 @@ class DirectoryCommander extends Readable {
 }
 
 module.exports = {DirectoryCommander}
-
-
-})();

@@ -32,16 +32,12 @@ function delete_files(folder, names, done) {
     });
 }
 
-
 test('DirectoryCommander makes a readable', async function(done) {
   const tmp_prefix =  "DirectoryCommander-test-dir";
   let directoryCommander = new DirectoryCommander;
-
-  let base_path = join(os.tmpdir(), tmp_prefix)
-  console.log("base_path", base_path)
-  let finalized_path;
+  let base_path = join(os.tmpdir(), tmp_prefix);
   let created_path = fs.mkdtempSync(base_path);
-  console.log("folder is", created_path);
+  console.log("folder is", created_path, "base_path", base_path);
   let tree = [{
     name:"alpha.html",
     contents:'<div>alpha auto-gen html</div>',
@@ -52,15 +48,14 @@ test('DirectoryCommander makes a readable', async function(done) {
     encoding:'utf8'
   }];
 
-  // console.log("The tree is", tree);
   _.each(tree, function(meta) {
-    console.log("Setup test. Make files to read... name is", meta.name)
+    console.debug("Setup test. Make files to read... name is", meta.name)
     let filePath = join(created_path, meta.name);
     fs.writeFileSync(filePath, meta.contents, {encoding: meta.encoding, flag:'w'});
   });
   // END setup... move this elsewhere once you can share variables.
   let contents = await directoryCommander.awaitReaddir(created_path);
-  console.log("directoryCommander", "contents", contents, created_path);
+  console.debug("directoryCommander", "contents", contents, created_path);
   expect(contents.length).toBe(tree.length);
   let _first_filename = _.first(contents);
   let _first_tree = _.first(tree);

@@ -16,36 +16,21 @@ class ReadWrap extends Readable {
   }
   async readdir(dirpath, opts) {
     let local_queue = this.queue;
-    let results;
     let awaited = null;
-    let err = null;
     try {
-      // {err, awaited} = await readdir(dirpath);
-      results = await readdir(dirpath, opts);
-      if(err) {
-        console.error("ERROR", err);
-        throw "Scan Directory ERROR";
-      } 
+      awaited = await readdir(dirpath, opts);
     } catch(e) {
       console.error("ERROR", e);
       throw "UNKNOWN ERROR IN SCAN"
     }
-    
-    return results;
-
+    return awaited;
   }
-
-
   _read(byteSize) {
-    console.log("this.queue", this.queue.length, this.queue);
     let candidate = this.queue.unshift();
-    console.log("candidate",candidate)
     if(candidate) this.push(candidate);
-    // return this.push(candidate || null)
     return this;
   }
 }
-
 
 module.exports = {
   ReadWrap
